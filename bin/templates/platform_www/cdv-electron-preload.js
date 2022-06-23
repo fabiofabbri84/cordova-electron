@@ -22,11 +22,16 @@ const { cordova } = require('./package.json');
 
 contextBridge.exposeInMainWorld('_cdvElectronIpc', {
     exec: (success, error, serviceName, action, args) => {
-        return ipcRenderer.invoke('cdv-plugin-exec', serviceName, action, args)
-            .then(
-                success,
-                error
-            );
+        return ipcRenderer.invoke('cdv-plugin-exec', serviceName, action, args).then(
+            (response) => {
+                if (response.success) {
+                    (typeof success === 'function') && success(...(response.args));
+                } else {
+                    (typeof error === 'function') && error(...(response.args));
+                }
+            },
+            error // this should not happen, maybe it should throw an exception instead
+        );
     },
 
     hasService: (serviceName) => cordova &&

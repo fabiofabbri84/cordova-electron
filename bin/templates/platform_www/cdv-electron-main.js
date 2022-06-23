@@ -146,16 +146,32 @@ app.on('activate', () => {
     }
 });
 
-ipcMain.handle('cdv-plugin-exec', async (_, serviceName, action, ...args) => {
-    if (cordova && cordova.services && cordova.services[serviceName]) {
-        const plugin = require(cordova.services[serviceName]);
-
-        return plugin[action]
-            ? plugin[action](args)
-            : Promise.reject(new Error(`The action "${action}" for the requested plugin service "${serviceName}" does not exist.`));
-    } else {
-        return Promise.reject(new Error(`The requested plugin service "${serviceName}" does not exist have native support.`));
+ipcMain.handle('cdv-plugin-exec', async (_, serviceName, action, args) => {
+    const response = { success: false, args: [] };
+    try {
+        if (cordova && cordova.services && cordova.services[serviceName]) {
+            const plugin = require(cordova.services[serviceName]);
+            if (plugin[action]) {
+                return new Promise((resolve, reject) => {
+                    plugin[action]((...args) => {
+                        resolve({ success: true, args: args });
+                    }, (...args) => {
+                        resolve({ success: false, args: args });
+                    }, args);
+                });
+            } else {
+                // This should not happen, maybe it should throw an exception instead
+                response.args = [new Error(`The action "${action}" for the requested plugin service "${serviceName}" does not exist.`)];
+            }
+        } else {
+            // This should not happen, maybe it should throw an exception instead
+            response.args = [new Error(`The requested plugin service "${serviceName}" does not have native support.`)];
+        }
+    } catch (e) {
+        // This should not happen, maybe it should not catch the exception
+        response.args = [e];
     }
+    return response;
 });
 
 // In this file you can include the rest of your app's specific main process
